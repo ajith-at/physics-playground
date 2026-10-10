@@ -79,25 +79,28 @@ cv.addEventListener('pointercancel',e=>{game&&game.up&&game.up(pos(e))});
 const G=9.8,LEN=20;
 function slideGame(id){
   const rounds=id==='push'?[
-    {mu:.3,name:'Floor',col:'#3a4a66',x:3,t:[12,15],obj:'brick',hint:'Drag from the brick to PUSH it onto the yellow pad'},
-    {mu:.3,name:'Floor',col:'#3a4a66',x:17,t:[5,8],obj:'brick',hint:'Now drag the other way to PULL it back'},
+    {mu:.3,name:'Floor',col:'#3a4a66',x:3,dir:1,rng:[6,11],obj:'brick',hint:'Drag from the brick to PUSH it onto the yellow pad'},
+    {mu:.3,name:'Floor',col:'#3a4a66',x:17,dir:-1,rng:[6,11],obj:'brick',hint:'Now drag the other way to PULL it back'},
   ]:[
-    {mu:.03,name:'❄️ Ice',col:'#9fd8ef',x:2,t:[13,15.5],obj:'puck',hint:'Ice is slippery! Flick gently…'},
-    {mu:.2,name:'🟫 Carpet',col:'#8a5a44',x:2,t:[13,15.5],obj:'puck',hint:'Carpet grabs the puck more'},
-    {mu:.45,name:'🌱 Grass',col:'#3f8f4f',x:2,t:[13,15.5],obj:'puck',hint:'Grass is the grippiest!'},
+    {mu:.05,name:'❄️ Ice',col:'#9fd8ef',x:2,dir:1,rng:[7,12],obj:'puck',hint:'Ice is slippery! Flick gently…'},
+    {mu:.2,name:'🟫 Carpet',col:'#8a5a44',x:2,dir:1,rng:[7,12],obj:'puck',hint:'Carpet grabs the puck more'},
+    {mu:.5,name:'🌱 Grass',col:'#3f8f4f',x:2,dir:1,rng:[7,12],obj:'puck',hint:'Grass is the grippiest!'},
   ];
+  const VMAX=12.5; // one fixed push-to-speed scale for every surface
+  for(const R of rounds){const c=R.x+R.dir*(R.rng[0]+Math.random()*(R.rng[1]-R.rng[0]));R.t=[c-1.5,c+1.5];R.ghost=null}
   let r=0,tries=0,s,drag=null,msg='',msgT=0;
   const ctrl=$('controls');
   function reset(){const R=rounds[r];s={x:R.x,v:0,moving:false,done:false,wait:0};drag=null;
-    const need=Math.sqrt(2*R.mu*G*(Math.abs((R.t[0]+R.t[1])/2-R.x)));R.vmax=need*1.7;
+    R.vmax=VMAX;
     ctrl.innerHTML=`<span style="color:${C.teal}">${R.hint}</span>`;$('hud').textContent=`Level ${r+1}/${rounds.length} · tries ${tries}`}
   reset();
   const ppm=()=>(W-60)/LEN,gx=m=>30+m*ppm(),gy=()=>H*.62,MAXD=()=>Math.min(320,W*.4);
   return{
+    info:()=>({x:s.x,c:(rounds[r].t[0]+rounds[r].t[1])/2,mu:rounds[r].mu,vmax:VMAX,maxd:MAXD(),r}),
     down(p){if(s.moving||s.wait)return;if(Math.abs(p.x-gx(s.x))<70&&Math.abs(p.y-(gy()-25))<80)drag={x:p.x}},
     move(p){if(drag)drag.x=p.x},
     up(){if(!drag)return;const d=Math.max(-MAXD(),Math.min(MAXD(),drag.x-gx(s.x)));drag=null;if(Math.abs(d)<8)return;
-      s.v=rounds[r].vmax*d/MAXD();s.moving=true;tries++;$('hud').textContent=`Level ${r+1}/${rounds.length} · tries ${tries}`},
+      rounds[r].ghost=d/MAXD();s.v=rounds[r].vmax*d/MAXD();s.moving=true;tries++;$('hud').textContent=`Level ${r+1}/${rounds.length} · tries ${tries}`},
     update(dt){const R=rounds[r];msgT=Math.max(0,msgT-dt);
       if(s.moving){const dec=R.mu*G*dt;s.x+=s.v*dt;if(Math.abs(s.v)<=dec){s.v=0}else s.v-=Math.sign(s.v)*dec;
         if(s.x<0.6){s.x=0.6;s.v=0}if(s.x>LEN-.6){s.x=LEN-.6;s.v=0}
@@ -112,6 +115,7 @@ function slideGame(id){
       const x=gx(s.x);
       if(R.obj==='brick')brick(x,y,70,42,'#e3463c');
       else{ctx.fillStyle='#222';ctx.strokeStyle=C.blue;ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x,y-8,26,10,0,0,7);ctx.fill();ctx.stroke();ctx.fillRect(x-26,y-16,52,8)}
+      if(R.ghost&&!s.moving){const gd=R.ghost*MAXD();ctx.globalAlpha=.3;arrow(x,y-25,x+gd,y-25,C.blue,5);text('last try '+Math.round(Math.abs(R.ghost)*100)+'%',x+gd,y-48,C.blue,14);ctx.globalAlpha=1}
       if(drag){const d=Math.max(-MAXD(),Math.min(MAXD(),drag.x-x));const lbl=id==='push'?(d>0===(R.t[0]>R.x)?(r===1?'pull':'push'):'push'):'flick';
         if(r===1&&id==='push'){ctx.strokeStyle='#c9b48a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y-25);ctx.lineTo(x+d,y-25);ctx.stroke()}
         arrow(x,y-25,x+d,y-25,C.yellow,7,lbl+' '+Math.round(Math.abs(d)/MAXD()*100)+'%')}
@@ -119,14 +123,15 @@ function slideGame(id){
       if(s.moving){const vs=s.v*ppm()*.35;arrow(x,y-70,x+vs,y-70,C.teal,5,'speed');arrow(x,y+12,x-Math.sign(s.v)*Math.max(20,R.mu*160),y+12,C.red,5);text('friction',x-Math.sign(s.v)*50,y+38,C.red,15)}
       if(msgT>0){ctx.globalAlpha=Math.min(1,msgT*2);text(msg,W/2,H*.18,C.txt,32);ctx.globalAlpha=1}}
   };
-  function end(){const n=rounds.length,st=tries<=n+1?3:tries<=n*2+1?2:1;ctrl.innerHTML='';
+  function end(){const n=rounds.length,st=tries<=n*2?3:tries<=n*4?2:1;ctrl.innerHTML='';
     if(id==='push')finish(st,'Forces move things!','A <b style="color:#ffd866">force</b> is a push or a pull. A bigger arrow means a bigger force, so the brick moves faster.<br><span style="color:#fc6255">Friction</span> is a sneaky force that rubs against moving things and slows them down until they stop.');
     else finish(st,"Newton's 1st Law!",'A moving thing <b>keeps moving</b> unless a force stops it. On <span style="color:#9fd8ef">ice</span> there is almost no friction, so a tiny flick goes a long way. <span style="color:#3f8f4f">Grass</span> has lots of friction, so you need a big push. With <i>no</i> friction at all (like in space), the puck would slide forever!')}
 }
 
 // ---------- race game ----------
 function raceGame(){
-  const rounds=[{d:12,t:3},{d:20,t:4},{d:18,t:2}];
+  const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+  const rounds=[];while(rounds.length<3){const sp=ri(2,10),t=ri(2,5),d=sp*t;if(d<8||d>30||rounds.some(q=>q.d/q.t===sp))continue;rounds.push({d,t})}
   let r=0,tries=0,speed=1,s,msg='',msgT=0;const ctrl=$('controls');
   function ui(){ctrl.innerHTML=`<button class="btn" id="minus">−</button><span style="min-width:150px;text-align:center;color:${C.teal}">speed <b id="sp">${speed}</b> m/s</span><button class="btn" id="plus">+</button><button class="btn go" id="go">GO ▶</button>`;
     $('minus').onclick=()=>{if(!s.run){speed=Math.max(1,speed-1);$('sp').textContent=speed}};
@@ -136,6 +141,7 @@ function raceGame(){
   function reset(){s={x:0,time:0,run:false,wait:0};ui();hud()}
   reset();
   return{
+    info:()=>({d:rounds[r].d,t:rounds[r].t,r}),
     update(dt){const R=rounds[r];msgT=Math.max(0,msgT-dt);
       if(s.run){s.time+=dt;s.x=speed*s.time;if(s.x>=R.d){s.x=R.d;s.time=R.d/speed;s.run=false;
         if(speed===R.d/R.t){msg=`✅ ${s.time.toFixed(1)} s — exactly right!`;s.next=true;s.wait=1.6}
