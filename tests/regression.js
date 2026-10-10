@@ -21,6 +21,19 @@ for(let rep=0;rep<3;rep++){
   if(!await p.isVisible('#overlay')){fails++;console.log('race not finished')}await back();
   await p.click('text=Slide');for(const s of['ice','carpet','grass']){await nonBlank(`n1#${rep} ${s}`);await flick(15)}
   if(!await p.isVisible('#overlay')){fails++;console.log('n1 not finished')}await back();
+
+  await p.click('text=Heavy vs Light');
+  const reach=(g,F,m)=>{const a=Math.max(0,F/m-g.MU*9.8),v=a*g.T;return a*g.T*g.T/2+v*v/(2*g.MU*9.8)};
+  const waitLvl=async k=>{await p.waitForFunction(k=>game.over||game.info().lvl===k,k,{timeout:40000});await p.waitForTimeout(300)};
+  {let g=await p.evaluate(()=>game.info());await nonBlank(`n2#${rep} L1`);await p.click(g.heavyTop?'#pickBot':'#pickTop');await waitLvl(1);
+   g=await p.evaluate(()=>game.info());await nonBlank(`n2#${rep} L2`);const m=g.CART+g.n2*g.BRICK;let lo=0,hi=g.FMAX;for(let i=0;i<50;i++){const mid=(lo+hi)/2;reach(g,mid,m)<g.c2-g.x0?lo=mid:hi=mid}
+   pcts.push(`n2L2(${g.n2}b,${g.c2.toFixed(1)}m):${Math.round(lo/g.FMAX*100)}%`);
+   const box=await p.locator('#cv').boundingBox();const ppm=(box.width-60)/20,x=box.x+30+g.x0*ppm,y=box.y+box.height*.62-25;
+   await p.mouse.move(x,y);await p.mouse.down();await p.mouse.move(x+lo/g.FMAX*g.maxd,y,{steps:6});await p.mouse.up();await waitLvl(2);
+   g=await p.evaluate(()=>game.info());await nonBlank(`n2#${rep} L3`);let ans=-1;for(let k=0;k<=8;k++){const d=g.x0+reach(g,g.F3,g.CART+k*g.BRICK);if(d>=g.t3[0]&&d<=g.t3[1])ans=k}
+   pcts.push(`n2L3(push ${Math.round(g.F3/g.FMAX*100)}%):${ans}b`);for(let k=0;k<ans;k++)await p.click('#bp');await p.click('#bgo');
+   await p.waitForFunction(()=>game.over,null,{timeout:40000})}
+  if(!await p.isVisible('#overlay')){fails++;console.log('n2 not finished')}await back();
   await p.click('text=Pushes');await nonBlank(`push reopen-quit#${rep}`);await back();
 }
 console.log('winning drags',pcts.join(' '));console.log('ERRORS',JSON.stringify(errs));await b.close();process.exit(fails||errs.length?1:0)})();

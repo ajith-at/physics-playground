@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id);
 
 const GROUPS=[
  {name:'1 · Foundations',items:[{id:'push',name:'💪 Pushes & Pulls',needs:null},{id:'race',name:'🏁 Speed Race',needs:'push'}]},
- {name:"2 · Newton's Laws",items:[{id:'n1',name:'🏒 Slide & Stop (1st Law)',needs:'race'},{id:'n2',name:'🛒 Heavy vs Light (2nd Law)',soon:1},{id:'n3',name:'🎈 Balloon Rocket (3rd Law)',soon:1}]},
+ {name:"2 · Newton's Laws",items:[{id:'n1',name:'🏒 Slide & Stop (1st Law)',needs:'race'},{id:'n2',name:'🛒 Heavy vs Light (2nd Law)',needs:'n1'},{id:'n3',name:'🎈 Balloon Rocket (3rd Law)',soon:1}]},
  {name:'3 · Gravity',items:[{id:'g1',name:'🪶 Feather & Hammer',soon:1},{id:'g2',name:'🕰️ Pendulums',soon:1}]},
  {name:'4 · Energy',items:[{id:'e1',name:'🎢 Build a Coaster',soon:1}]},
  {name:'5 · Electricity',items:[{id:'c1',name:'💡 Light the Bulb',soon:1},{id:'c2',name:'🔋 Voltage = Pressure',soon:1}]},
@@ -54,7 +54,7 @@ let game=null,last=0;
 function start(id,name){
   $('map').classList.add('hidden');$('game').classList.remove('hidden');$('overlay').classList.add('hidden');
   $('title').textContent=name;resize();
-  game=id==='race'?raceGame():slideGame(id);game.id=id;game.name=name;
+  game=id==='race'?raceGame():id==='n2'?cartGame():slideGame(id);game.id=id;game.name=name;
 }
 function toMap(){game=null;$('game').classList.add('hidden');$('map').classList.remove('hidden');renderMap()}
 $('back').onclick=toMap;$('next').onclick=toMap;$('again').onclick=()=>start(game.id,game.name);
@@ -164,6 +164,71 @@ function raceGame(){
   };
   function end(){ctrl.innerHTML='';const st=tries<=4?3:tries<=7?2:1;
     finish(st,'Speed = distance ÷ time','<b style="color:#5cd0b3">Speed</b> tells how many metres you go each second. To drive <b>12 m</b> in <b>3 s</b> you need <b>4 m</b> every second, because 12 ÷ 3 = 4.<br>Faster speed = more metres every second!')}
+}
+
+// ---------- Newton 2: carts ----------
+function cartGame(){
+  const X0=2,FMAX=70,T=0.6,MU=0.1,CART=2,BRICK=1,ctrl=$('controls');
+  const rnd=(a,b)=>a+Math.random()*(b-a),ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+  const reach=(F,m)=>{const a=Math.max(0,F/m-MU*G),v=a*T;return a*T*T/2+v*v/(2*MU*G)};
+  const posAt=(F,m,t)=>{const q=posRaw(F,m,t);if(X0+q.x>19.3)return{x:19.3-X0,v:0,a:0,stop:true};return q};
+  const posRaw=(F,m,t)=>{const a=Math.max(0,F/m-MU*G);if(t<T)return{x:a*t*t/2,v:a*t,a,push:true};
+    const v1=a*T,d1=a*T*T/2,tc=t-T,ts=v1/(MU*G);if(tc<ts)return{x:d1+v1*tc-MU*G*tc*tc/2,v:v1-MU*G*tc,a:-MU*G};return{x:d1+v1*ts/2,v:0,a:0,stop:true}};
+  // level 1: same push, light vs heavy
+  const L1={nl:ri(0,1),nh:ri(4,6),heavyTop:Math.random()<.5};{const goal=rnd(11,15);let lo=0,hi=FMAX;for(let i=0;i<40;i++){const m=(lo+hi)/2;reach(m,CART+L1.nl*BRICK)<goal?lo=m:hi=m}L1.F=lo}
+  // level 2: random load + random target, child picks the push
+  let L2;do{const n=ri(1,6),c=rnd(6,14);L2={n,c,ghost:null};}while(!(reach(FMAX*.9,CART+L2.n*BRICK)>L2.c-X0+1.5));
+  // level 3: fixed push, child picks bricks
+  let L3;for(;;){const F=FMAX*rnd(.5,.7),ans=ri(1,6),d=k=>reach(F,CART+k*BRICK),c=d(ans);if(c<5||c>16)continue;
+    const lo=Math.min(1.5,.4*(d(ans-1)-c)),hi=Math.min(1.5,.4*(c-d(ans+1)));L3={F,ans,t:[X0+c-hi,X0+c+lo],n:0,ghost:null};break}
+  let lvl=0,tries=0,sim=null,drag=null,msg='',msgT=0,wait=0,ok=false;
+  const hud=()=>$('hud').textContent=`Level ${lvl+1}/3 · tries ${tries}`;
+  function setup(){sim=null;drag=null;hud();
+    if(lvl===0)ctrl.innerHTML=`<span style="color:${C.teal}">Same push for both. Which goes further?</span><button class="btn" id="pickTop">Top</button><button class="btn" id="pickBot">Bottom</button>`,
+      $('pickTop').onclick=()=>pick(true),$('pickBot').onclick=()=>pick(false);
+    else if(lvl===1)ctrl.innerHTML=`<span style="color:${C.teal}">Drag from the cart: how big a push to reach the pad?</span>`;
+    else{ctrl.innerHTML=`<span style="color:${C.teal}">Push is fixed. Load bricks:</span><button class="btn" id="bm">−</button><b id="bn" style="min-width:40px;text-align:center">${L3.n}</b><button class="btn" id="bp">+</button><button class="btn go" id="bgo">GO ▶</button>`;
+      $('bm').onclick=()=>{if(!sim&&!wait){L3.n=Math.max(0,L3.n-1);$('bn').textContent=L3.n}};$('bp').onclick=()=>{if(!sim&&!wait){L3.n=Math.min(8,L3.n+1);$('bn').textContent=L3.n}};
+      $('bgo').onclick=()=>{if(sim||wait)return;tries++;hud();sim={t:0,carts:[{F:L3.F,m:CART+L3.n*BRICK,n:L3.n}]}}}}
+  function pick(top){if(sim||wait)return;tries++;hud();ok=top!==L1.heavyTop;
+    const H={F:L1.F,m:CART+L1.nh*BRICK,n:L1.nh},Lc={F:L1.F,m:CART+L1.nl*BRICK,n:L1.nl};sim={t:0,carts:L1.heavyTop?[H,Lc]:[Lc,H]}}
+  setup();
+  const ppm=()=>(W-60)/20,gx=m=>30+m*ppm(),MAXD=()=>Math.min(320,W*.4),laneY=i=>H*(lvl===0?(i?.75:.42):.62);
+  function target(){return lvl===1?[L2.c-1.5,L2.c+1.5]:lvl===2?L3.t:null}
+  function drawCart(x,y,n){ctx.fillStyle='#ddd';ctx.strokeStyle='#111';ctx.lineWidth=3;for(const o of[-20,20]){ctx.beginPath();ctx.arc(x+o,y-7,7,0,7);ctx.fill();ctx.stroke()}
+    brick(x,y-12,64,14,'#f2c230');const cols=['#e3463c','#2f7de1','#3f8f4f','#e3463c'];for(let i=0;i<n;i++)brick(x+(i%2?8:-8),y-36-i*20+8,40,14,cols[i%4]);
+    text(`${CART+n*BRICK} kg`,x,y+22,C.txt,14)}
+  return{
+    info:()=>({lvl,F:L1.F,heavyTop:L1.heavyTop,n2:L2.n,c2:L2.c,F3:L3.F,t3:L3.t,FMAX,T,MU,CART,BRICK,maxd:MAXD(),x0:X0}),
+    down(p){if(lvl!==1||sim||wait)return;if(Math.abs(p.x-gx(X0))<70&&Math.abs(p.y-(laneY(0)-25))<90)drag={x:p.x}},
+    move(p){if(drag)drag.x=p.x},
+    up(){if(!drag)return;const d=Math.max(0,Math.min(MAXD(),drag.x-gx(X0)));drag=null;if(d<8)return;L2.ghost=d/MAXD();tries++;hud();
+      sim={t:0,carts:[{F:FMAX*d/MAXD(),m:CART+L2.n*BRICK,n:L2.n}]}},
+    update(dt){msgT=Math.max(0,msgT-dt);
+      if(sim&&sim.carts){sim.t+=dt;const st=sim.carts.map(c=>posAt(c.F,c.m,sim.t));if(st.every(q=>q.stop)){
+          if(lvl===0){msg=ok?'✅ Yes! The light cart goes further.':'❌ The light cart goes further!';}
+          else{const t=target(),x=X0+st[0].x;ok=x>=t[0]&&x<=t[1];if(lvl===2&&!ok)L3.ghost=L3.n;
+            msg=ok?'✅ Perfect!':(x<t[0]?(lvl===1?'Too gentle — bigger push!':'Too heavy — fewer bricks!'):(lvl===1?'Too hard — smaller push!':'Too light — more bricks!'))}
+          msgT=1.6;wait=1.6;sim.done=st;sim.carts=null}}
+      if(sim&&!sim.carts){wait-=dt;if(wait<=0){wait=0;const adv=lvl===0||ok;sim=null;if(adv){lvl++;if(lvl>2)return end()}setup()}}},
+    draw(){const n=lvl===0?2:1,t=target();
+      if(t){const y=laneY(0);ctx.fillStyle=C.yellow+'44';ctx.fillRect(gx(t[0]),y-90,gx(t[1])-gx(t[0]),90);ctx.fillStyle=C.yellow;ctx.fillRect(gx(t[0]),y-4,gx(t[1])-gx(t[0]),6);text('STOP HERE',gx((t[0]+t[1])/2),y-105,C.yellow,16)}
+      for(let i=0;i<n;i++){const y=laneY(i);ctx.fillStyle='#3a4a66';ctx.fillRect(30,y,W-60,12);
+        let cart,q;if(lvl===0)cart=(L1.heavyTop===(i===0))?{F:L1.F,m:CART+L1.nh,n:L1.nh}:{F:L1.F,m:CART+L1.nl,n:L1.nl};
+        else if(lvl===1)cart={F:0,n:L2.n};else cart={F:L3.F,n:L3.n};
+        if(sim&&sim.carts)q=posAt(sim.carts[i].F,sim.carts[i].m,sim.t);else if(sim&&sim.done)q=sim.done[i];else q={x:0,v:0,a:0};
+        const x=gx(X0+q.x);drawCart(x,y,cart.n);
+        if(q.push){arrow(x-90,y-20,x-40,y-20,C.yellow,7,'push');arrow(x,y-130-cart.n*20,x+q.a*8,y-130-cart.n*20,C.red,5,'acceleration')}
+        if(q.v>0)arrow(x,y-95-cart.n*20,x+q.v*14,y-95-cart.n*20,C.teal,5,'speed')}
+      if(lvl===1&&!sim){const x=gx(X0),y=laneY(0);
+        if(L2.ghost){const gd=L2.ghost*MAXD();ctx.globalAlpha=.3;arrow(x,y-25,x+gd,y-25,C.blue,5);text('last try '+Math.round(L2.ghost*100)+'%',x+gd,y-48,C.blue,14);ctx.globalAlpha=1}
+        if(drag){const d=Math.max(0,Math.min(MAXD(),drag.x-x));arrow(x,y-25,x+d,y-25,C.yellow,7,'push '+Math.round(d/MAXD()*100)+'%')}
+        else{const k=(Math.sin(performance.now()/300)+1)/2;arrow(x,y-130,x+40+20*k,y-130,C.yellow+'88',4);text('drag me',x,y-155,C.yellow+'aa',16)}}
+      if(lvl===2){text(`push = ${Math.round(L3.F/FMAX*100)}%`,W/2,H*.3,C.yellow,22);if(L3.ghost!==null&&!sim)text(`last try: ${L3.ghost} bricks`,W/2,H*.3+30,C.blue+'99',16)}
+      if(msgT>0){ctx.globalAlpha=Math.min(1,msgT*2);text(msg,W/2,H*.15,C.txt,30);ctx.globalAlpha=1}}
+  };
+  function end(){ctrl.innerHTML='';const st=tries<=4?3:tries<=7?2:1;
+    finish(st,"Newton's 2nd Law!",'The same <b style="color:#ffd866">push</b> makes a <b>light</b> cart speed up a lot, but a <b>heavy</b> cart only a little. Heavier things need a bigger push to get going.<br>Scientists write it as <b>F = m × a</b>: force = mass × acceleration.')}
 }
 
 renderMap();requestAnimationFrame(loop);
