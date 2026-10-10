@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Josh's Physics Playground</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<div id="map" class="screen">
+  <h1>Physics <span class="y">Playground</span></h1>
+  <p class="sub">Earn ⭐ to unlock new worlds</p>
+  <div id="groups"></div>
+  <button id="reset" class="small">Reset progress</button>
+</div>
+<div id="game" class="screen hidden">
+  <div class="bar"><button id="back" class="btn">◀ Map</button><div id="title"></div><div id="hud"></div></div>
+  <canvas id="cv"></canvas>
+  <div id="controls"></div>
+  <div id="overlay" class="hidden"><div class="card"><div id="stars"></div><h2 id="ovTitle"></h2><p id="ovText"></p>
+    <div class="row"><button id="again" class="btn">↻ Again</button><button id="next" class="btn go">Map ▶</button></div></div></div>
+</div>
+<script src="app.js"></script>
+</body></html>
