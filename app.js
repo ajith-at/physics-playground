@@ -60,14 +60,14 @@ function toMap(){game=null;$('game').classList.add('hidden');$('map').classList.
 $('back').onclick=toMap;$('next').onclick=toMap;$('again').onclick=()=>start(game.id,game.name);
 $('reset').onclick=()=>{if(confirm('Reset all stars?')){stars={};save();renderMap()}};
 function finish(n,title,expl){
-  const id=game.id;stars[id]=Math.max(stars[id]||0,n);save();
+  game.over=true;const id=game.id;stars[id]=Math.max(stars[id]||0,n);save();
   $('stars').innerHTML=`<span style="color:${C.yellow}">${'★'.repeat(n)}</span><span style="color:#33435e">${'★'.repeat(3-n)}</span>`;
   $('ovTitle').textContent=title;$('ovText').innerHTML=expl;$('overlay').classList.remove('hidden');
 }
 function loop(t){const dt=Math.min(.05,(t-last)/1000||0);last=t;
-  if(game&&W){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+  if(game&&W&&!game.over){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
     ctx.strokeStyle=C.grid;ctx.lineWidth=1;for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-    game.update(dt);game.draw()}
+    try{if(!game.over){game.update(dt);if(!game.over)game.draw()}}catch(e){console.error(e)}}
   requestAnimationFrame(loop)}
 function pos(e){const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);game&&game.down&&game.down(pos(e))});
